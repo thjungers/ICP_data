@@ -1,7 +1,7 @@
 #!/usr/bin/python3.6
 """
 ICP data extraction script
-Version 1.0
+Version 1.1
 
 MIT License
 
@@ -40,7 +40,7 @@ import matplotlib
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
-__version__ = "1.0"
+__version__ = "1.1"
 
 ELM_RE = re.compile(r'([A-Z][a-z]?) +([0-9.]+)')
 MASSES = {'H': 1.00794, 'He': 4.002602, 'Li': 6.941, 'Be': 9.012182,
@@ -165,6 +165,15 @@ class Wavelength:
 
 
 class Sample:
+    """A sample
+
+    Attributes:
+        data         Reference to the data object
+        intensities  Intensities
+        results      2D list: wavelength, [int_avg, int_sd, conc, conc_sd]
+        means        2D list: element, [mean_conc, mean_conc_sd]
+    """
+
     def __init__(self, data):
         self.data = data
         self.intensities = {}
@@ -194,15 +203,20 @@ class Sample:
         return ratio, ratio_sd
 
     def __mean(self):
+        """Calculate the mean of the concentration from all wavelengths.
+
+        v1.1: the mean is now inverse-variance weighted.
+        """
         for elm, elm_wls in self.data.elements.items():
             count = len(elm_wls)
-            total = 0
-            total_sd = 0
+            total_x_var = 0
+            total_1_var = 0
             for wl_label in elm_wls:
-                total += self.results[wl_label][2]
-                total_sd += self.results[wl_label][3]
-            self.means[elm] = (total / count,
-                               total_sd / count)
+                total_x_var += self.results[wl_label][2] \
+                    / self.results[wl_label][3]**2
+                total_1_var += 1 / self.results[wl_label][3]**2
+            self.means[elm] = (total_x_var / total_1_var,
+                               np.sqrt(count / total_1_var))
 
 
 class ICPData:
